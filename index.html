@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>行业报告生成器</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        background-color: #f8f9fa;
+      }
+      .form-container {
+        max-width: 800px;
+        margin: 0 auto;
+        background-color: white;
+        padding: 2rem;
+        border-radius: 10px;
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+      }
+      .progress-container {
+        margin-top: 2rem;
+      }
+      .result-container {
+        margin-top: 2rem;
+        display: none;
+      }
+      .spinner-border {
+        margin-right: 0.5rem;
+      }
+      .download-option {
+        margin-bottom: 1rem;
+        padding: 1rem;
+        border: 1px solid #dee2e6;
+        border-radius: 0.5rem;
+      }
+      .download-option:hover {
+        background-color: #f8f9fa;
+      }
+      .download-option h5 {
+        margin-bottom: 0.5rem;
+      }
+      .download-option p {
+        margin-bottom: 0.5rem;
+        color: #6c757d;
+        font-size: 0.9rem;
+      }
+      .download-option .btn {
+        margin-top: 0.5rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="form-container">
+        <h1 class="mb-4 text-center">行业报告生成器</h1>
+
+        <form id="reportForm">
+          <div class="mb-3">
+            <label for="industry" class="form-label">行业关键词</label>
+            <input
+              type="text"
+              class="form-control"
+              id="industry"
+              name="industry"
+              required
+              placeholder="例如：医疗器械、成品油等"
+            />
+          </div>
+
+          <div class="mb-3">
+            <label for="zhipuApiKey" class="form-label"
+              >智谱API密钥 (用于Step1)</label
+            >
+            <input
+              type="text"
+              class="form-control"
+              id="zhipuApiKey"
+              name="zhipu_api_key"
+              required
+              placeholder="输入智谱API密钥"
+            />
+            <div class="form-text">用于内容收集阶段</div>
+          </div>
+
+          <div class="mb-3">
+            <label for="deepseekApiKey" class="form-label"
+              >DeepSeek API密钥 (用于Step0, Step2, Step3)</label
+            >
+            <input
+              type="text"
+              class="form-control"
+              id="deepseekApiKey"
+              name="deepseek_api_key"
+              required
+              placeholder="输入DeepSeek API密钥"
+            />
+            <div class="form-text">用于模板生成、内容优化和报告合并阶段</div>
+          </div>
+
+          <div class="mb-3">
+            <label for="template" class="form-label">报告模板（可选）</label>
+            <input
+              type="file"
+              class="form-control"
+              id="template"
+              name="template"
+              accept=".json,.md,.txt"
+            />
+            <div class="form-text">上传JSON或Markdown格式的报告模板</div>
+          </div>
+
+          <div class="mb-3">
+            <label for="currentIndustry" class="form-label"
+              >模板中的行业关键词（可选）</label
+            >
+            <input
+              type="text"
+              class="form-control"
+              id="currentIndustry"
+              name="current_industry"
+              placeholder="如果使用模板，请输入模板中的行业关键词"
+            />
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">输出格式</label>
+            <div class="form-check">
+              <input
+                class="form-check-input"
+                type="radio"
+                name="output_format"
+                id="formatMarkdown"
+                value="markdown"
+                checked
+              />
+              <label class="form-check-label" for="formatMarkdown">
+                Markdown
+              </label>
+            </div>
+            <div class="form-check">
+              <input
+                class="form-check-input"
+                type="radio"
+                name="output_format"
+                id="formatPdf"
+                value="pdf"
+              />
+              <label class="form-check-label" for="formatPdf">
+                PDF（需要安装pandoc）
+              </label>
+            </div>
+          </div>
+
+          <div class="d-grid gap-2">
+            <button type="submit" class="btn btn-primary" id="generateBtn">
+              生成报告
+            </button>
+          </div>
+        </form>
+
+        <div
+          class="progress-container"
+          id="progressContainer"
+          style="display: none"
+        >
+          <h4>生成进度</h4>
+          <div class="progress" style="height: 25px">
+            <div
+              class="progress-bar progress-bar-striped progress-bar-animated"
+              id="progressBar"
+              role="progressbar"
+              style="width: 0%"
+              aria-valuenow="0"
+              aria-valuemin="0"
+              aria-valuemax="100"
+            >
+              0%
+            </div>
+          </div>
+          <p class="mt-2" id="progressMessage">初始化中...</p>
+        </div>
+
+        <div class="result-container" id="resultContainer">
+          <div class="alert alert-success" role="alert">
+            <h4 class="alert-heading">报告生成完成！</h4>
+            <p id="resultMessage"></p>
+          </div>
+
+          <h5 class="mt-4">下载选项</h5>
+
+          <!-- 标准Markdown下载选项 -->
+          <div class="download-option">
+            <h5>标准Markdown版本</h5>
+            <p>
+              包含相对路径的图片引用，适合在本地查看。需要保持图片文件夹结构完整。
+            </p>
+            <button
+              type="button"
+              class="btn btn-outline-primary"
+              id="downloadMarkdownBtn"
+            >
+              下载标准Markdown报告
+            </button>
+          </div>
+
+          <!-- 自包含Markdown下载选项 -->
+          <div class="download-option">
+            <h5>自包含Markdown版本</h5>
+            <p>
+              图片已内联为base64格式，可在任何Markdown查看器中完整显示，无需额外的图片文件。
+            </p>
+            <button
+              type="button"
+              class="btn btn-outline-primary"
+              id="downloadSelfContainedBtn"
+            >
+              下载自包含Markdown报告
+            </button>
+          </div>
+
+          <!-- PDF下载选项 -->
+          <div class="download-option">
+            <h5>PDF版本</h5>
+            <p>专业的PDF格式，适合打印和分享。包含目录和格式化样式。</p>
+            <button
+              type="button"
+              class="btn btn-outline-primary"
+              id="downloadPdfBtn"
+              style="display: none"
+            >
+              下载PDF报告
+            </button>
+          </div>
+
+          <!-- 完整压缩包下载选项 -->
+          <div class="download-option">
+            <h5>完整压缩包</h5>
+            <p>
+              包含所有源文件、图片和中间文件的完整ZIP压缩包，适合需要访问原始文件的用户。
+            </p>
+            <button
+              type="button"
+              class="btn btn-outline-primary"
+              id="downloadCompleteBtn"
+            >
+              下载完整压缩包
+            </button>
+          </div>
+        </div>
+
+        <div
+          class="alert alert-danger mt-3"
+          id="errorContainer"
+          style="display: none"
+        >
+          <h4 class="alert-heading">出错了！</h4>
+          <p id="errorMessage"></p>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        const reportForm = document.getElementById("reportForm");
+        const progressContainer = document.getElementById("progressContainer");
+        const progressBar = document.getElementById("progressBar");
+        const progressMessage = document.getElementById("progressMessage");
+        const resultContainer = document.getElementById("resultContainer");
+        const resultMessage = document.getElementById("resultMessage");
+        const errorContainer = document.getElementById("errorContainer");
+        const errorMessage = document.getElementById("errorMessage");
+        const downloadMarkdownBtn = document.getElementById(
+          "downloadMarkdownBtn"
+        );
+        const downloadSelfContainedBtn = document.getElementById(
+          "downloadSelfContainedBtn"
+        );
+        const downloadPdfBtn = document.getElementById("downloadPdfBtn");
+        const downloadCompleteBtn = document.getElementById(
+          "downloadCompleteBtn"
+        );
+
+        let taskId = null;
+        let pollingInterval = null;
+        let formData = null;
+
+        reportForm.addEventListener("submit", function (e) {
+          e.preventDefault();
+
+          // 显示进度条
+          progressContainer.style.display = "block";
+          resultContainer.style.display = "none";
+          errorContainer.style.display = "none";
+
+          // 禁用提交按钮
+          document.getElementById("generateBtn").disabled = true;
+
+          // 准备表单数据
+          formData = new FormData(reportForm);
+
+          // 发送请求
+          fetch("/api/generate-report", {
+            method: "POST",
+            body: formData,
+          })
+            .then((response) => response.json())
+            .then((data) => {
+              if (data.task_id) {
+                taskId = data.task_id;
+                // 开始轮询进度
+                pollingInterval = setInterval(checkProgress, 2000);
+              } else {
+                showError("启动任务失败: " + (data.error || "未知错误"));
+              }
+            })
+            .catch((error) => {
+              showError("请求出错: " + error.message);
+            });
+        });
+
+        function checkProgress() {
+          if (!taskId) return;
+
+          fetch(`/api/report-progress/${taskId}`)
+            .then((response) => response.json())
+            .then((data) => {
+              if (data.status === "completed") {
+                clearInterval(pollingInterval);
+
+                if (data.result.success) {
+                  // 显示成功结果
+                  resultMessage.textContent = `报告《${formData.get(
+                    "industry"
+                  )}行业调研报告》生成成功！总耗时: ${data.result.execution_time.toFixed(
+                    2
+                  )}秒`;
+                  resultContainer.style.display = "block";
+
+                  // 设置下载按钮
+                  downloadMarkdownBtn.onclick = () =>
+                    (window.location.href = `/api/download/${taskId}/markdown`);
+
+                  downloadSelfContainedBtn.onclick = () =>
+                    (window.location.href = `/api/download/${taskId}/self_contained`);
+
+                  downloadCompleteBtn.onclick = () =>
+                    (window.location.href = `/api/download/${taskId}/complete`);
+
+                  // 如果有PDF版本，显示PDF下载按钮
+                  if (data.result.output_files.final_report_pdf) {
+                    downloadPdfBtn.style.display = "block";
+                    downloadPdfBtn.onclick = () =>
+                      (window.location.href = `/api/download/${taskId}/pdf`);
+                  } else {
+                    downloadPdfBtn.style.display = "none";
+                  }
+
+                  // 更新进度条为100%
+                  updateProgress("报告生成完成！", 100);
+                } else {
+                  showError("报告生成失败: " + data.result.error);
+                }
+              } else if (data.status === "in_progress") {
+                // 更新进度
+                updateProgress(data.progress.message, data.progress.percentage);
+              } else {
+                showError("检查进度时出错: " + (data.message || "未知错误"));
+              }
+            })
+            .catch((error) => {
+              showError("检查进度时出错: " + error.message);
+            });
+        }
+
+        function updateProgress(message, percentage) {
+          progressBar.style.width = `${percentage}%`;
+          progressBar.textContent = `${percentage}%`;
+          progressBar.setAttribute("aria-valuenow", percentage);
+          progressMessage.textContent = message;
+        }
+
+        function showError(message) {
+          clearInterval(pollingInterval);
+          errorMessage.textContent = message;
+          errorContainer.style.display = "block";
+          document.getElementById("generateBtn").disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>
